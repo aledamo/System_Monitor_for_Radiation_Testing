@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 '''
@@ -83,7 +82,7 @@ def ram_test(data_dirname):
         ram_pct_used+=[ram_pct]
 
         if end-start > data_save_interval:
-            time1 = time.time()
+            #time1 = time.time()
 
             data = {'time':ttime,'ram_pct_used':ram_pct_used,'upsets':upsets}
 

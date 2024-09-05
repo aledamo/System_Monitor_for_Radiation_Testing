@@ -1,0 +1,28 @@
+plugins {
+    id 'com.bmuschko.docker-remote-api' version '9.4.0'
+    id 'base'
+}
+
+repositories {
+    mavenCentral()
+}
+
+version = "1.1.2"
+//architecture = "arm64"
+
+task buildBinary(){
+    def command = "docker run --rm -v ${projectDir}:/tmp/project  builder bash -c 'cd /tmp/project;" +
+                  "pip3.11 install -r requirements.txt;" +
+		  "pyinstaller --runtime-tmpdir /var/tmp --onefile --workpath /tmp --specpath /tmp -n test_cpu --distpath build py_src/test_cpu.py;" +
+		  "pyinstaller --runtime-tmpdir /var/tmp --onefile --workpath /tmp --specpath /tmp -n test_disks --distpath build py_src/test_disks.py;" + 
+		  "pyinstaller --runtime-tmpdir /var/tmp --onefile --workpath /tmp --specpath /tmp -n test_networks --distpath build py_src/test_networks.py;" +
+                  "pyinstaller --runtime-tmpdir /var/tmp --onefile --workpath /tmp --specpath /tmp -n test_ram --distpath build py_src/test_ram.py'"
+    doLast {
+        exec {
+            executable "sh"
+            args "-c", command
+        }
+    }
+}
+
+
