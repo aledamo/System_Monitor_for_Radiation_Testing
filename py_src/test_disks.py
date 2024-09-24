@@ -38,6 +38,7 @@ def disk_test(data_dirname):
     disk_space_free=[]
     disk_space_used_pct=[]
     disk_info=[]
+    nvme_temp=[]
 
     print(str(time.time()) + ': starting disk monitor!')
 
@@ -63,6 +64,8 @@ def disk_test(data_dirname):
         disk_space_used_pct+=[psutil.disk_usage(disks[1][0])[3]]
         disk_info+=[disks]
 
+        nvme_temp += [psutil.sensors_temperatures()['nvme'][0].current]
+
         if num_detected_disks[-1] != old_num_detected_disks:
             print('\n\n     NUMBER OF DISKS HAS CHANGED!\n\n')
             print(old_num_detected_disks)
@@ -72,7 +75,7 @@ def disk_test(data_dirname):
         if end-start > data_save_interval:
             time1 = time.time()
 
-            data = {'time':ttime,'num_detected_disks':num_detected_disks, 'disk_info':disk_info}
+            data = {'time':ttime,'num_detected_disks':num_detected_disks, 'disk_info':disk_info, 'nvme_temp': nvme_temp}
 
             now = str(datetime.now())
             now = now.split('.')
@@ -95,6 +98,7 @@ def disk_test(data_dirname):
             disk_space_free=[]
             disk_space_used_pct=[]
             disk_info=[]
+            nvme_temp=[]
 
 
             #reset time

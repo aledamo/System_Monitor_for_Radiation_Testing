@@ -15,6 +15,7 @@ import sys
 import csv
 import time
 import json
+
 import psutil
 from datetime import datetime
 
@@ -36,6 +37,7 @@ def cpu_test(data_dirname):
     cpu_pct_used=[]
     cpu_temp=[]
     cpu_freq=[]
+    cpu_count = []
 
     print(str(time.time()) + ': starting CPU monitor!')
     
@@ -49,12 +51,11 @@ def cpu_test(data_dirname):
 
         ttime+=[time.time()]
         cpu_pct_used+=[psutil.cpu_percent()]
-        cpu_freq+=[psutil.cpu_freq(percpu=False)[0]] #NOTE that as of 12/2020 this is the rated val on windows, not current
-
+        cpu_freq+=[psutil.cpu_freq(percpu=False).current] #NOTE that as of 12/2020 this is the rated val on windows, not current
+        cpu_count+=[psutil.cpu_count()]
 
         if 'linux' in sys.platform:
-            print(psutil.sensors_temperatures())
-            cpu_temp+=[psutil.sensors_temperatures()['cpu-thermal'][0][1]]
+            cpu_temp+=[psutil.sensors_temperatures()['coretemp'][0].current]
         else:
             cpu_temp+=[9999] #TODO figure out how to do this on Windows
 
@@ -62,7 +63,7 @@ def cpu_test(data_dirname):
         if end-start > data_save_interval:
             time1 = time.time()
 
-            data = {'time':ttime,'cpu_pct_used':cpu_pct_used,'cpu_temp':cpu_temp,'cpu_freq':cpu_freq}
+            data = {'time':ttime,'cpu_pct_used':cpu_pct_used,'cpu_temp':cpu_temp,'cpu_freq':cpu_freq, 'cpu_count':cpu_count}
 
             now = str(datetime.now())
             now = now.split('.')
@@ -82,6 +83,7 @@ def cpu_test(data_dirname):
             cpu_temp=[]
             cpu_pct_used=[]
             cpu_freq=[]
+            cpu_count=[]
 
             #reset time
             start = time.time()
