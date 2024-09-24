@@ -20,6 +20,11 @@ import psutil
 from datetime import datetime
 
 
+import influxdb_client, os, time
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS, ASYNCHRONOUS
+
+
 #############################################################
 # SUPPORT FUNCTIONS
 #############################################################
@@ -38,6 +43,20 @@ def cpu_test(data_dirname):
     cpu_temp=[]
     cpu_freq=[]
     cpu_count = []
+
+    host_ip = '127.0.0.1'
+    host_port = '8086'
+    username = 'tas'
+    password = 't4l3s4l3n14'
+    org = "tas"
+    bucket = '2crsi'
+    url = f'http://{host_ip}:{host_port}'
+
+
+
+    write_client = influxdb_client.InfluxDBClient(username=username, password=password, url=url, org=org)
+    # Define the write api
+    write_api = write_client.write_api(write_options=SYNCHRONOUS)
 
     print(str(time.time()) + ': starting CPU monitor!')
     
@@ -59,6 +78,13 @@ def cpu_test(data_dirname):
         else:
             cpu_temp+=[9999] #TODO figure out how to do this on Windows
 
+        timestamp = int(time.time())
+        data = {'cpu_pct_used': cpu_pct_used, 'cpu_temp': cpu_temp, 'cpu_freq': cpu_freq,
+                'cpu_count': cpu_count}
+        for key in data:
+            point = Point(measurement_name="cpu").time(timestamp, WritePrecision.S) \
+            .field(key, str(data[key]))
+            write_api.write(bucket=bucket, org=org, record=point)
 
         if end-start > data_save_interval:
             time1 = time.time()

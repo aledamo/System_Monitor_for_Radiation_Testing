@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  influxdb:
+    image: influxdb:2.7.10-alpine
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: 'setup'
+      DOCKER_INFLUXDB_INIT_USERNAME: 'tas'
+      DOCKER_INFLUXDB_INIT_PASSWORD: 't4l3s4l3n14'
+      DOCKER_INFLUXDB_INIT_ORG: 'tas'
+      DOCKER_INFLUXDB_INIT_BUCKET: '2crsi'
+    volumes:
+      - influxdbv2:/var/lib/influxdb2:rw
+    ports:
+      - "8086:8086"
+
+volumes:
+  influxdbv2:
