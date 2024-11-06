@@ -18,23 +18,32 @@ import json
 import psutil
 from datetime import datetime
 
-
+import influxdb_client, os, time
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS, ASYNCHRONOUS
 #############################################################
 # SUPPORT FUNCTIONS
 #############################################################
-def ram_test(data_dirname):
+def ram_test():
 
     #load inputs
     with open('data.json') as f:
         data = json.load(f)
-    data_save_interval = data['data_save_interval']
+
     test_cycle_time = data['test_cycle_time']
     ram_pct_to_use = data['ram_pct_to_use']
 
-    #define vars
-    ttime=[]
-    upsets=[]
-    ram_pct_used=[]
+    host_ip = data['host_ip']
+    host_port = data['host_port']
+    username = data['username']
+    password = data['password']
+    org = data['org']
+    bucket = data['bucket']
+    url = f'http://{host_ip}:{host_port}'
+
+    write_client = influxdb_client.InfluxDBClient(username=username, password=password, url=url, org=org)
+    # Define the write api
+    write_api = write_client.write_api(write_options=SYNCHRONOUS)
 
     print(str(time.time()) + ': starting RAM monitor!')
 
@@ -62,7 +71,7 @@ def ram_test(data_dirname):
     print(len(ram_soaker))
 
     print('\n\nWatching for changed RAM vals...')
-    start = time.time()
+
     while True:
 
         time.sleep(test_cycle_time)
@@ -70,59 +79,28 @@ def ram_test(data_dirname):
         outliers = [i for i in range(1,len(ram_soaker)) if ram_soaker[i]!=ram_soaker[i-1] ]
         if len(outliers) > 0:
             print('\n\n     RAM STATE CHANGE DETECTED!\n\n')
-            upsets+=[1]
+            upsets=1
         else:
-            upsets+=[0]
+            upsets=0
 
-        end = time.time()
-
-        ttime+=[time.time()]
         ram_info = psutil.virtual_memory()
         ram_pct = ram_info[2]
-        ram_pct_used+=[ram_pct]
+        ram_pct_used = ram_pct
 
-        if end-start > data_save_interval:
-            #time1 = time.time()
+        timestamp = int(time.time())
 
-            data = {'time':ttime,'ram_pct_used':ram_pct_used,'upsets':upsets}
-
-            now = str(datetime.now())
-            now = now.split('.')
-            now = now[0]
-            now = now.replace(' ','_')
-            now = now.replace(':','-')
-
-            #write stuff
-            keys=sorted(data.keys())
-            with open(os.path.join(data_dirname, now+'ram_log.csv'),'w', newline='') as csv_file:
-                 writer=csv.writer(csv_file)
-                 writer.writerow(keys)
-                 writer.writerows(zip(*[data[key] for key in keys]))
-
-            #reset vars
-            ttime=[]
-            upsets=[]
-            ram_pct_used=[]
-
-            #reset time
-            start = time.time()
+        data = {'ram_pct_used': ram_pct_used, 'upsets': upsets}
+        for key in data:
+            point = Point(measurement_name="network").time(timestamp, WritePrecision.S) \
+                .field(key, str(data[key]))
+            write_api.write(bucket=bucket, org=org, record=point)
 
 
 #############################################################
 # MAIN CODE
 #############################################################
 if __name__ == '__main__':
-
-    try:
-        data_dirname = sys.argv[1]
-    except:
-        data_dirname = '../data/demo'
-    if os.path.exists(os.path.join(data_dirname)):
-        pass
-    else:
-        os.makedirs(os.path.join(data_dirname))
-    #print(data_dirname)
-    ram_test(data_dirname)
+    ram_test()
 
 
 

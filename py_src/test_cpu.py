@@ -10,15 +10,9 @@ monitor CPU usage
 #############################################################
 #IMPORT MODULES
 #############################################################
-import os
-import sys
-import csv
-import time
+
 import json
-
 import psutil
-from datetime import datetime
-
 
 import influxdb_client, os, time
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -33,23 +27,15 @@ def cpu_test(data_dirname):
     #load inputs
     with open('data.json') as f:
         data = json.load(f)
-    data_save_interval = data['data_save_interval']
+
     test_cycle_time = data['test_cycle_time']
 
-    #define vars
-    ttime=[]
-    upsets=[]
-    cpu_pct_used=[]
-    cpu_temp=[]
-    cpu_freq=[]
-    cpu_count = []
-
-    host_ip = '127.0.0.1'
-    host_port = '8086'
-    username = 'tas'
-    password = 't4l3s4l3n14'
-    org = "tas"
-    bucket = '2crsi'
+    host_ip = data['host_ip']
+    host_port = data['host_port']
+    username = data['username']
+    password = data['password']
+    org = data['org']
+    bucket = data['bucket']
     url = f'http://{host_ip}:{host_port}'
 
 
@@ -59,24 +45,15 @@ def cpu_test(data_dirname):
     write_api = write_client.write_api(write_options=SYNCHRONOUS)
 
     print(str(time.time()) + ': starting CPU monitor!')
-    
-    #one day we might have user-configurable CPU usage here
 
-    start = time.time()
+
     while True:
-
         time.sleep(test_cycle_time)
-        end = time.time()
 
-        ttime+=[time.time()]
-        cpu_pct_used+=[psutil.cpu_percent()]
-        cpu_freq+=[psutil.cpu_freq(percpu=False).current] #NOTE that as of 12/2020 this is the rated val on windows, not current
-        cpu_count+=[psutil.cpu_count()]
-
-        if 'linux' in sys.platform:
-            cpu_temp+=[psutil.sensors_temperatures()['coretemp'][0].current]
-        else:
-            cpu_temp+=[9999] #TODO figure out how to do this on Windows
+        cpu_pct_used = psutil.cpu_percent()
+        cpu_freq = psutil.cpu_freq(percpu=False).current
+        cpu_count = psutil.cpu_count()
+        cpu_temp = psutil.sensors_temperatures()['coretemp'][0].current # Valid on linux only
 
         timestamp = int(time.time())
         data = {'cpu_pct_used': cpu_pct_used, 'cpu_temp': cpu_temp, 'cpu_freq': cpu_freq,
@@ -86,50 +63,11 @@ def cpu_test(data_dirname):
             .field(key, str(data[key]))
             write_api.write(bucket=bucket, org=org, record=point)
 
-        if end-start > data_save_interval:
-            time1 = time.time()
-
-            data = {'time':ttime,'cpu_pct_used':cpu_pct_used,'cpu_temp':cpu_temp,'cpu_freq':cpu_freq, 'cpu_count':cpu_count}
-
-            now = str(datetime.now())
-            now = now.split('.')
-            now = now[0]
-            now = now.replace(' ','_')
-            now = now.replace(':','-')
-
-            #write stuff
-            keys=sorted(data.keys())
-            with open(os.path.join(data_dirname, now+'cpu_log.csv'),'w', newline='') as csv_file:
-                 writer=csv.writer(csv_file)
-                 writer.writerow(keys)  
-                 writer.writerows(zip(*[data[key] for key in keys]))
-
-            #reset vars
-            ttime=[]
-            cpu_temp=[]
-            cpu_pct_used=[]
-            cpu_freq=[]
-            cpu_count=[]
-
-            #reset time
-            start = time.time()
-
-
 #############################################################
 # MAIN CODE
 #############################################################
 if __name__ == '__main__':
-
-    try:
-        data_dirname = sys.argv[1]
-    except:
-        data_dirname = '../data/demo'
-    if os.path.exists(os.path.join(data_dirname)):
-        pass
-    else:
-        os.makedirs(os.path.join(data_dirname))
-    #print(data_dirname)
-    cpu_test(data_dirname)
+    cpu_test()
 
 
 

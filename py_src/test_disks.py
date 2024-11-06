@@ -10,116 +10,76 @@ and record related data
 #############################################################
 #IMPORT MODULES
 #############################################################
-import os
-import sys
-import csv
-import time
 import json
 import psutil
-from datetime import datetime
 
+import influxdb_client, time
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS, ASYNCHRONOUS
 
 #############################################################
 # SUPPORT FUNCTIONS
 #############################################################
-def disk_test(data_dirname):
+def disk_test():
 
     #load inputs
     with open('data.json') as f:
         data = json.load(f)
-    data_save_interval = data['data_save_interval']
+
     test_cycle_time = data['test_cycle_time']
 
-    #define vars
-    ttime=[]
-    num_detected_disks=[]
-    disk_space_total=[]
-    disk_space_used=[]
-    disk_space_free=[]
-    disk_space_used_pct=[]
-    disk_info=[]
-    nvme_temp=[]
+    host_ip = data['host_ip']
+    host_port = data['host_port']
+    username = data['username']
+    password = data['password']
+    org = data['org']
+    bucket = data['bucket']
+    url = f'http://{host_ip}:{host_port}'
+
+    write_client = influxdb_client.InfluxDBClient(username=username, password=password, url=url, org=org)
+    # Define the write api
+    write_api = write_client.write_api(write_options=SYNCHRONOUS)
 
     print(str(time.time()) + ': starting disk monitor!')
 
     disks = psutil.disk_partitions()
     old_num_detected_disks = len(disks)
 
-    #probably create list of drives here for data storage
-
-    start = time.time()
     while True:
 
         time.sleep(test_cycle_time)
-        end = time.time()
 
-        ttime+=[time.time()]
         disks = psutil.disk_partitions()
-        num_detected_disks+=[len(disks)]
-# how to deal with variable number of disks?
+        num_detected_disks = len(disks)
+        disk_info = disks
+        nvme_temp = psutil.sensors_temperatures()['nvme'][0].current
 
-        disk_space_total+=[psutil.disk_usage(disks[1][0])[0]]
-        disk_space_used+=[psutil.disk_usage(disks[1][0])[1]]
-        disk_space_free+=[psutil.disk_usage(disks[1][0])[2]]
-        disk_space_used_pct+=[psutil.disk_usage(disks[1][0])[3]]
-        disk_info+=[disks]
+        # Other info not used yet
+        disk_space_total = psutil.disk_usage(disks[1][0])[0]
+        disk_space_used = psutil.disk_usage(disks[1][0])[1]
+        disk_space_free = psutil.disk_usage(disks[1][0])[2]
+        disk_space_used_pct = psutil.disk_usage(disks[1][0])[3]
 
-        nvme_temp += [psutil.sensors_temperatures()['nvme'][0].current]
 
-        if num_detected_disks[-1] != old_num_detected_disks:
+        if num_detected_disks != old_num_detected_disks:
             print('\n\n     NUMBER OF DISKS HAS CHANGED!\n\n')
             print(old_num_detected_disks)
             print(num_detected_disks)
             old_num_detected_disks = num_detected_disks
 
-        if end-start > data_save_interval:
-            time1 = time.time()
+        timestamp = int(time.time())
 
-            data = {'time':ttime,'num_detected_disks':num_detected_disks, 'disk_info':disk_info, 'nvme_temp': nvme_temp}
-
-            now = str(datetime.now())
-            now = now.split('.')
-            now = now[0]
-            now = now.replace(' ','_')
-            now = now.replace(':','-')
-
-            #write stuff
-            keys=sorted(data.keys())
-            with open(os.path.join(data_dirname, now+'disk_log.csv'),'w', newline='') as csv_file:
-                 writer=csv.writer(csv_file)
-                 writer.writerow(keys)
-                 writer.writerows(zip(*[data[key] for key in keys]))
-
-            #reset vars
-            ttime=[]
-            num_detected_disks=[]
-            disk_space_total=[]
-            disk_space_used=[]
-            disk_space_free=[]
-            disk_space_used_pct=[]
-            disk_info=[]
-            nvme_temp=[]
-
-
-            #reset time
-            start = time.time()
-
+        data = {'num_detected_disks': num_detected_disks, 'disk_info': disk_info, 'nvme_temp': nvme_temp}
+        for key in data:
+            point = Point(measurement_name="disks").time(timestamp, WritePrecision.S) \
+                .field(key, str(data[key]))
+            write_api.write(bucket=bucket, org=org, record=point)
 
 #############################################################
 # MAIN CODE
 #############################################################
 if __name__ == '__main__':
-
-    try:
-        data_dirname = sys.argv[1]
-    except:
-        data_dirname = '../data/demo'
-    if os.path.exists(os.path.join(data_dirname)):
-        pass
-    else:
-        os.makedirs(os.path.join(data_dirname))
-    #print(data_dirname)
-    disk_test(data_dirname)
+    disk_test()
 
 
 
